@@ -14,7 +14,7 @@ chrome_option = webdriver.ChromeOptions()
 chrome_option.add_argument("--disable-blink-features=AutomationControlled")
 chrome_option.add_experimental_option("excludeSwitches", ['enable-automation', 'enable-logging'])
 browser = webdriver.Chrome(options=chrome_option)
-browser.maximize_window()
+#browser.maximize_window()
 url = 'https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=dc'
 date_list = str(date.today()+1) ###get the date of tomorrow
 t = 1
@@ -193,4 +193,5 @@ try:
 except Exception as e:
     print(e)
     print('出错')
-pandas.DataFrame(d).to_excel('data.xlsx', index=False)
+pandas.DataFrame(d).to_excel(str(date_list, '.xlsx'), index=False)
+chromeDriver.close()
