@@ -4,6 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 import pandas
+from datetime import date
 
 data = pandas.read_excel('城市对.xlsx') #need to prepare ahead
 d = []
@@ -15,7 +16,7 @@ chrome_option.add_experimental_option("excludeSwitches", ['enable-automation', '
 browser = webdriver.Chrome(options=chrome_option)
 browser.maximize_window()
 url = 'https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=dc'
-date_list = ['2024-06-10'] ###this should be replaced by the automatic date acquisition later
+date_list = str(date.today()+1) ###get the date of tomorrow
 t = 1
 
 browser.get(url)
