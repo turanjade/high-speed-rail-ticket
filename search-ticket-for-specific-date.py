@@ -16,8 +16,9 @@ chrome_option.add_experimental_option("excludeSwitches", ['enable-automation', '
 browser = webdriver.Chrome(options=chrome_option)
 #browser.maximize_window()
 url = 'https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=dc'
-date_list = str(date.today()+1) ###get the date of tomorrow
-t = 1
+date_today = str(date.today()) ###get the date of today
+date_tmr = str(date.today() + 1) ###get the date of today
+start_time_list = ['00:00--06:00', '06:00--12:00', '12:00--18:00', '18:00--24:00'] #search based on the starting time.
 
 browser.get(url)
 while True:
@@ -32,7 +33,7 @@ try:
         print(n)
         city1 = city[0][:-1] + city[0][-1].replace('市', '') #origin
         city2 = city[1][:-1] + city[1][-1].replace('市', '') #destination
-        for date in date_list:
+        for date in date_today and time in start_time_list: #or in date_tmr
             try:
                 city1_input = browser.find_element(by=By.ID, value='fromStationText')
                 city1_input.clear()
@@ -193,5 +194,5 @@ try:
 except Exception as e:
     print(e)
     print('出错')
-pandas.DataFrame(d).to_excel(str(date_list, '.xlsx'), index=False)
+pandas.DataFrame(d).to_excel(str(date_today, '.xlsx'), index=False)
 chromeDriver.close()
