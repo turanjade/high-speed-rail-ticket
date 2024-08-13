@@ -22,7 +22,7 @@ browser = webdriver.Chrome(options=chrome_option)
 #browser.maximize_window()
 url = 'https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=dc'
 #date_today = str(date.today()) ###get the date of today
-date = str(date.today()+timedelta(days=1))
+date = [str(date.today()+timedelta(days=1))]
 #date_tmr = str(date.today() + 1) ###get the date of tomorrow
 #start_time_list = ['00:00--06:00', '06:00--12:00', '12:00--18:00', '18:00--24:00'] #search based on the starting time.
 start_time_list = ['00000600', '06001200', '12001800', '18002400'] #search based on the starting time.
@@ -44,9 +44,9 @@ try:
         print(n)
         city1 = city[0][:-1] + city[0][-1].replace('市', '') #origin
         city2 = city[1][:-1] + city[1][-1].replace('市', '') #destination
-#        for date, time in zip(date_today, start_time_list): #or in date_tmr
-        for time in start_time_list: ###only iterate through time
-            print(date, time)
+        for date in date: #or in date_tmr
+        #for time in start_time_list: ###only iterate through time
+            print(date)
             try:
                 ### find valid original city
                 city1_input = browser.find_element(by=By.ID, value='fromStationText')
@@ -97,11 +97,11 @@ try:
 
                 ###define time, droplist, should select
                 ### ============================================================
-                select = Select(driver.find_element_by_id("cc_start_time"));
-                select.select_by_visible_text(time);
-                print('time entered')
+                #select = Select(driver.find_element_by_id("cc_start_time"));
+                #select.select_by_visible_text(time);
+                #print('time entered')
                 ### ============================================================
-                
+
                 ###start searching in the browser
                 browser.execute_script('arguments[0].click();', browser.find_element(by=By.ID, value='query_ticket'))
                 time.sleep(0.3)
