@@ -8,6 +8,13 @@ import pandas
 from datetime import date
 from datetime import timedelta
 
+date_list = [str(date.today() + timedelta(1))]
+#date_list = ['2024-06-13','2024-06-14']
+# t对应12306官网上对应发车时间区间（1-5）
+t_list = [1,2,3,4,5] # 想获取数据的时间段（五个时间段分别对应？）全天，0-6，6-12，12-18，18-24，四个时间段
+time_i = 0
+t = t_list[time_i]
+
 data = pandas.read_excel('citypair_sample.xlsx') #need to prepare ahead
 
 print('read excel up')
@@ -18,6 +25,8 @@ chrome_option = webdriver.ChromeOptions()
 # chrome_option.add_argument('--user-data-dir='+p)
 chrome_option.add_argument("--disable-blink-features=AutomationControlled")
 chrome_option.add_experimental_option("excludeSwitches", ['enable-automation', 'enable-logging'])
+chrome_option.add_argument('--ignore-certificate-errors')
+chrome_option.add_argument('--ignore-ssl-errors')
 browser = webdriver.Chrome(options=chrome_option)
 #browser.maximize_window()
 url = 'https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=dc'
@@ -25,7 +34,6 @@ url = 'https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=dc'
 date = [str(date.today()+timedelta(days=1))]
 #date_tmr = str(date.today() + 1) ###get the date of tomorrow
 #start_time_list = ['00:00--06:00', '06:00--12:00', '12:00--18:00', '18:00--24:00'] #search based on the starting time.
-start_time_list = ['00000600', '06001200', '12001800', '18002400'] #search based on the starting time.
 
 browser.get(url)
 
@@ -33,22 +41,18 @@ browser.get(url)
 while True:
     if len(browser.find_elements(by=By.ID, value='fromStationText')) != 0:
         break
-
-### pass the first filter
 ActionChains(browser).move_to_element(browser.find_element(by=By.ID, value='fromStationText')).perform()
 try:
     for n in data.index[:]:
         p = 0
         city = data.loc[n, :].values
-        print(city)
-        print(n)
-        city1 = city[0][:-1] + city[0][-1].replace('市', '') #origin
-        city2 = city[1][:-1] + city[1][-1].replace('市', '') #destination
-        for date in date: #or in date_tmr
-        #for time in start_time_list: ###only iterate through time
-            print(date)
+        print(city, n)
+        city1 = city[0][:-1] + city[0][-1].replace('市', '')
+        city2 = city[1][:-1] + city[1][-1].replace('市', '')
+        # city1 = '太原'
+        # city2 = '张家口'
+        for date in date_list:
             try:
-                ### find valid original city
                 city1_input = browser.find_element(by=By.ID, value='fromStationText')
                 city1_input.clear()
                 city1_input.send_keys(city1)
@@ -66,10 +70,8 @@ try:
                         pass
                 if p == 0:
                     city1_input.send_keys(Keys.ENTER)
-                print('origin city entered')
-
-                ### find valid desination city
                 city2_input = browser.find_element(by=By.ID, value='toStationText')
+                # ActionChains(browser).move_to_element(city2_input).perform()
                 city2_input.clear()
                 city2_input.send_keys(city2)
                 while True:
@@ -86,23 +88,10 @@ try:
                         pass
                 if p == 0:
                     city2_input.send_keys(Keys.ENTER)
-                print('destination city entered')
-
-                ###define date
                 date_input = browser.find_element(by=By.ID, value='train_date')
                 date_input.clear()
                 date_input.send_keys(date)
                 date_input.send_keys(Keys.ENTER)
-                print('date entered')
-
-                ###define time, droplist, should select
-                ### ============================================================
-                #select = Select(driver.find_element_by_id("cc_start_time"));
-                #select.select_by_visible_text(time);
-                #print('time entered')
-                ### ============================================================
-
-                ###start searching in the browser
                 browser.execute_script('arguments[0].click();', browser.find_element(by=By.ID, value='query_ticket'))
                 time.sleep(0.3)
                 p = 0
@@ -115,31 +104,28 @@ try:
                 if p == 1:
                     item = {}
                     item['搜索日期'] = date
-                    item['搜索时间'] = time
                     item['车次'] = '无'
                     item['出发地'] = city[0]
                     item['目的地'] = city[1]
-                    print(item)
+                    #print(item)
                     d.append(item)
                     continue
                 if len(browser.find_elements(by=By.ID, value='cc_seat_type_O')) == 0:
                     item = {}
                     item['搜索日期'] = date
-                    item['搜索时间'] = time
                     item['车次'] = '无'
                     item['出发地'] = city[0]
                     item['目的地'] = city[1]
-                    print(item)
+                    #print(item)
                     d.append(item)
                     continue
                 if len(browser.find_elements(by=By.XPATH, value='//tbody[@id="queryLeftTable"]/tr')) == 0:
                     item = {}
                     item['搜索日期'] = date
-                    item['搜索时间'] = time
                     item['车次'] = '无'
                     item['出发地'] = city[0]
                     item['目的地'] = city[1]
-                    print(item)
+                    #print(item)
                     d.append(item)
                     continue
                 # browser.execute_script('arguments[0].click();', browser.find_element(by=By.ID, value='cc_seat_type_O'))
@@ -188,7 +174,6 @@ try:
                 for i in range(len(number_list)):
                     item = {}
                     item['搜索日期'] = date
-                    item['搜索时间'] = time
                     item['车次'] = number_list[i].text
                     item['出发地'] = s_list[i].find_elements(by=By.TAG_NAME, value='strong')[0].text
                     item['目的地'] = s_list[i].find_elements(by=By.TAG_NAME, value='strong')[1].text
@@ -214,19 +199,20 @@ try:
                     item['无座票价'] = price_list[i][8].text
                     item['其他'] = new_tr_list[i].find_elements(by=By.TAG_NAME, value='td')[10].text
                     item['其他票价'] = price_list[i][9].text
-                    print(item)
+                    #print(item)
+                    #print(i, item['出发地'], item['目的地'])
                     d.append(item)
             except:
                 item = {}
                 item['搜索日期'] = date
-                item['搜索时间'] = time
                 item['车次'] = '无'
                 item['出发地'] = city[0]
                 item['目的地'] = city[1]
-                print(item)
+                #print(item)
                 d.append(item)
 except Exception as e:
     print(e)
     print('出错')
+print('citypair1 finished')
 pandas.DataFrame(d).to_excel(date+'_sample.xlsx', index=False)
 browser.close()
