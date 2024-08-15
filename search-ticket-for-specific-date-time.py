@@ -12,10 +12,10 @@ date_list = [str(date.today() + timedelta(1))]
 #date_list = ['2024-06-13','2024-06-14']
 # t对应12306官网上对应发车时间区间（1-5）
 t_list = [1,2,3,4,5] # 想获取数据的时间段（五个时间段分别对应？）全天，0-6，6-12，12-18，18-24，四个时间段
-time_i = 0
+time_i = 1
 t = t_list[time_i]
 
-data = pandas.read_excel('citypair_sample.xlsx') #need to prepare ahead
+data = pandas.read_excel('citypair_dir_1.xlsx') #need to prepare ahead
 
 print('read excel up')
 
@@ -129,6 +129,7 @@ try:
                     d.append(item)
                     continue
                 # browser.execute_script('arguments[0].click();', browser.find_element(by=By.ID, value='cc_seat_type_O'))
+                ###### redirect to a certain time period (decision var: t, defined at the beginning)
                 browser.find_element(by=By.XPATH, value=f'//*[@id="cc_start_time"]/option[{t}]').click()
                 time.sleep(0.3)
                 tr_list = browser.find_elements(by=By.XPATH, value='//tbody[@id="queryLeftTable"]/tr')
@@ -214,5 +215,5 @@ except Exception as e:
     print(e)
     print('出错')
 print('citypair1 finished')
-pandas.DataFrame(d).to_excel(date+'_sample.xlsx', index=False)
+pandas.DataFrame(d).to_excel(date+'_'+str(t)+'_sample.xlsx', index=False)
 browser.close()
