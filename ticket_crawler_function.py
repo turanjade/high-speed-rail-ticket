@@ -147,7 +147,7 @@ def citypairticket(cityO, cityD, date, t):
         item['出发地'] = city[0]
         item['目的地'] = city[1]
         print(item)
-        #d.append(item)
+        d.append(item)
         #continue
 
     if len(browser.find_elements(by=By.ID, value='cc_seat_type_O')) == 0:
@@ -157,7 +157,7 @@ def citypairticket(cityO, cityD, date, t):
         item['出发地'] = city[0]
         item['目的地'] = city[1]
         print(item)
-        #d.append(item)
+        d.append(item)
         #continue
 
     if len(browser.find_elements(by=By.XPATH, value='//tbody[@id="queryLeftTable"]/tr')) == 0:
@@ -167,7 +167,7 @@ def citypairticket(cityO, cityD, date, t):
         item['出发地'] = city[0]
         item['目的地'] = city[1]
         print(item)
-        #d.append(item)
+        d.append(item)
         #continue
 
     ### 
@@ -254,7 +254,7 @@ def citypairticket(cityO, cityD, date, t):
             item['其他票价'] = price_list[i][10].text
             print(item)
             #print(i, item['出发地'], item['目的地'])
-            #d.append(item)
+            d.append(item)
 
     except Exception as e:
         item = {}
@@ -263,17 +263,18 @@ def citypairticket(cityO, cityD, date, t):
         item['出发地'] = city[0]
         item['目的地'] = city[1]
         print(item)
-        #d.append(item)
+        d.append(item)
     
-    return item
+    return d
 
 
 ### 尝试使用上述function挖掘一整个citypair list，明天一整天的票务数据
+## 首先定义运行位置
 date = currentdate("tomorrow")
 time = 0 ###全天
 # time = currenttime("8:15") ###如果想用某一刻时间，需要参考左边的表达
 ## 针对样本数据，可采取已有列举城市对进行数据挖掘（即citypair_dir_1.xlsx. 对于任意城市对，可输入任意城市对为city1和city2，代入方程中进行票务检索。
-cities = pandas.read_excel('E:\\HSR-RTU\\citypair_dir_1.xlsx')
+cities = pandas.read_excel('citypair_dir_1.xlsx')
 ticket = []
 
 for n in cities.index[:]:
@@ -289,6 +290,19 @@ for n in cities.index[:]:
         print('出错')
     ticket.append(ticket_od)
 
-pandas.DataFrame(ticket).to_excel('E:\\HSR-RTU\\'+date+'_allday_citypair1'+'.xlsx', index=False) # 保存数据
+pandas.DataFrame(ticket).to_excel(date+'_allday_citypair1'+'.xlsx', index=False) # 保存数据
 
 browser.close()
+
+### 尝试使用上述function挖掘明天6：00-12：00上海市-苏州市的票务数据
+date = currentdate("tomorrow")
+time = 1 #明天上午6：00-12：00，不需要输入实时时间
+ticket = []
+
+try:
+    ticketsh_sz = citypairticket("上海市", "苏州市", date, time)
+except Exception as e:
+    print(e)
+    print("出错")
+
+print(ticketsh_sz)
