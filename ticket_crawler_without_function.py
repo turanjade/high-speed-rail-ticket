@@ -347,6 +347,10 @@ destination = d['到达城市'].unique()
 
 print(origin)
 print(destination)
+
+## Unique 出发站点和到达站点
+originS = d['出发地'].unique()
+destinationS = d['到达地'].unique()            
 #print(d)
 
 
@@ -359,34 +363,92 @@ def remainingseats(ticketdb, seatclass):
         remaining = 10000 # a max value 
     return(remaining)
 
+# average price
+def avgprice(ticketdb, seatclass):
+    price = pandas.to_numeric(ticketdb[seatclass], errors = 'coerce').mean()
+    return(price)
+
+# min price
+def minprice(ticketdb, seatclass):
+    price = pandas.to_numeric(ticketdb[seatclass], errors = 'coerce').min()
+    return(price)
+
+# HSR where there is not seats
+def noseats(ticketdb, seatclass):
+    count = ticketdb[ticketdb[seatclass].str.startswith('-')].shape[0] + ticketdb[ticketdb[seatclass].str.startswith('候补')].shape[0]
+    return(count)
+
 #print(networkmetric)
 networkmetric = []
 
 #d_df = pandas.DataFrame(d)
+dij_effi_price = 0
 for i in origin:
     #print(i)
     for j in destination:
         #print(j)
         pairs = d[(d['出发城市'] == i) & (d['到达城市'] == j)]
         if len(pairs) > 0:
+
             #print(pairs)
         ## hsr connection includes G and D
             hsr_connection = pairs[pairs['车次'].str.startswith('G')].shape[0] + pairs[pairs['车次'].str.startswith('D')].shape[0]
             ## if 2nd remaining has the string ’有', it means there are abundant of seats. Otherwise, sum all the numbers
-            second_remaining = remainingseats(pairs, '二等座')
-            ## if business remaining has the string ’有', it means there are abundant of seats. Otherwise, sum all the numbers
-            businessremaining = remainingseats(pairs, '商务座')
+            
             item = {}
             item['CityO'] = i
             item['CityD'] = j
             item['Distance'] = dist_twonames(i,j)
             item['Tot_connection'] = len(pairs)
             item['HSR_connection'] = hsr_connection
-            item['2ndClass_remaining'] = second_remaining
-            item['BusinessClass_remaining'] = businessremaining
+
+            item['2ndClass_remaining'] = remainingseats(pairs, '二等座')
+            item['2ndClass_price'] = avgprice(pairs, '二等座')
+            item['2ndClass_sellout'] = noseats(pairs, '二等座')
+
+            item['1stClass_remaining'] = remainingseats(pairs, '一等座')
+            item['1stClass_price'] = avgprice(pairs, '一等座')
+            item['1stClass_sellout'] = noseats(pairs, '一等座')
+
+            item['BusinessClass_remaining'] = remainingseats(pairs, '商务座')
+            item['BusinessClass_price'] = avgprice(pairs, '商务座')
+            item['BusinessClass_sellout'] = noseats(pairs, '商务座')
+
+            ## shortest path between i and j: here we define as the least price
+            item['lowest_price'] = minprice(pairs, '二等座')
+
+            ## calculate the number of remaining HSR that has seats available
+            item['SeatsAvailableLines'] = len(pairs)-item['2ndClass_sellout'] - item['1stClass_sellout'] + item['BusinessClass_sellout']
+                        
+            ## calculate redundancy between O and D, taking the lowest price as the shortest path
+            item['Redundancy'] = item['SeatsAvailableLines']/item['lowest_price']
+
+            ## calculate the remaining seats of the line
+            item['TotRemainingSeats'] = item['2ndClass_remaining'] + item['1stClass_remaining'] + item['BusinessClass_remaining']
+
+            ## accumulate network efficiency regarding the price
+            dij_effi_price += minprice(pairs, '二等座')
+
+            ## if we define the shortest path as the 
+
             # print(item)
             networkmetric.append(item)
 
-print(networkmetric)
-
 pandas.DataFrame(networkmetric).to_excel(inputdir+'networkmetric.xlsx', index=False)
+
+
+### 其他网络指标计算
+### total number of nodes in the network. We define the number of nodes as number of stations
+tot_nodes = len([originS, destinationS].unique())
+
+### calculate network density
+network_den = len(d)/(tot_nodes*(tot_nodes-1))
+
+### calculate network effective density
+network_effective_den = pandas.to_numeric(networkmetric['SeatsAvailableLines']).sum()/(tot_nodes*(tot_nodes-1))
+
+### calculate network efficiency using the lowest price of each HSR
+network_effi_price = dij_effi_price/(tot_nodes*(tot_nodes-1))
+
+### calculate network efficiency using the remaining seats of all the HSR
+network_effi_seats = pandas.to_numeric(networkmetric['TotRemainingSeats']).sum()/(tot_nodes*(tot_nodes-1))
