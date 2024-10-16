@@ -6,8 +6,42 @@ from selenium.webdriver.common.keys import Keys
 import pandas
 from datetime import date, timedelta, datetime
 import pytz
+import requests
+
 
 beijing_timezone = pytz.timezone('Asia/Shanghai')
+
+
+## 给定两个地名，在高德地图API中获取两地距离 -- 用于计算网络指标
+# Function to get latitude and longitude of a city
+def get_city_coordinates(city_name, api_key):
+    url = f'https://restapi.amap.com/v3/geocode/geo?address={city_name}&key={api_key}'
+    response = requests.get(url)
+    result = response.json()
+    
+    if result['geocodes']:
+        location = result['geocodes'][0]['location']
+        return location.split(",")  # Returns [longitude, latitude]
+    else:
+        return None
+
+# Function to calculate the distance between two coordinates
+def get_distance(origin_coords, dest_coords, api_key):
+    origins = ','.join(origin_coords)
+    destination = ','.join(dest_coords)
+    
+    url = f'https://restapi.amap.com/v3/distance?origins={origins}&destination={destination}&type=1&key={api_key}'
+    response = requests.get(url)
+    result = response.json()
+    
+    if result['results']:
+        distance = result['results'][0]['distance']  # Distance in meters
+        return distance
+    else:
+        return None
+
+# Replace with your actual API key
+api_key = 'a3088a73b4bedfcf95e01d08933aa701'
 
 
 ### 定义爬取数据日期。可以为“today”，“tomorrow”，或者具体日期，格式为YYYY-MM-DD
@@ -76,10 +110,10 @@ data = pandas.read_excel(str(inputdir + "citypair_sample2.xlsx"),skiprows = 1, h
 
 
 ### 手动输入城市对
-cityO = "上海市"
-cityD = "南京市"
-data = pandas.DataFrame([[cityO, cityD]])
-#print(str(data.loc[0,:][0]))
+cityO = ["上海市",'宜兴市','苏州市']
+cityD = ["宜兴市",'杭州市','合肥市']
+data = pandas.DataFrame({'cityO':cityO, 'cityD':cityD})
+print(data)
 
 
 #### 打开Chrome
@@ -282,7 +316,77 @@ except Exception as e:
 print('citypair finished')
 
 ## 导出数据
-pandas.DataFrame(d).to_excel(inputdir+date_list[0]+'-'+str(time_list)+'-'+cityO+"-"+cityD+'.xlsx', index=False)
+outputpath = str(inputdir+date_list[0]+'-'+str(time_list)+'-'+cityO[0]+"-"+cityD[0]+'.xlsx')
+pandas.DataFrame(d).to_excel(outputpath, index=False)
 
 browser.close()
 
+## 针对给定城市对组合，计算复杂网络指标
+
+# 获取城市间距离
+def dist_twonames(add_1, add_2):
+    # Get coordinates
+    origin_coords = get_city_coordinates(add_1, api_key)
+    dest_coords = get_city_coordinates(add_2, api_key)
+
+    if origin_coords and dest_coords:
+        # Get the distance
+        distance = float(get_distance(origin_coords, dest_coords, api_key))/1000
+        print(f"{add_1} 和 {add_2} 两地相距: {str(distance)} KM")
+    else:
+        print("地名坐标获取出错.")
+    return(distance)
+
+
+### 读取票务爬取数据
+d = pandas.read_excel(outputpath)
+
+#### 获取出发和到达城市
+origin = d['出发城市'].unique()
+destination = d['到达城市'].unique()
+
+print(origin)
+print(destination)
+#print(d)
+
+
+### count the ticket number remaining. If it contains ‘有', it means there are sufficient tickets. Otherwise, sum up all the numbers. If no number exists, it is zero
+def remainingseats(ticketdb, seatclass):
+    abundance = ticketdb[ticketdb[seatclass].str.startswith('有')].shape[0]
+    if abundance == 0:
+        remaining = pandas.to_numeric(ticketdb[seatclass], errors='coerce').sum()
+    else:
+        remaining = 10000 # a max value 
+    return(remaining)
+
+#print(networkmetric)
+networkmetric = []
+
+#d_df = pandas.DataFrame(d)
+for i in origin:
+    #print(i)
+    for j in destination:
+        #print(j)
+        pairs = d[(d['出发城市'] == i) & (d['到达城市'] == j)]
+        if len(pairs) > 0:
+            #print(pairs)
+        ## hsr connection includes G and D
+            hsr_connection = pairs[pairs['车次'].str.startswith('G')].shape[0] + pairs[pairs['车次'].str.startswith('D')].shape[0]
+            ## if 2nd remaining has the string ’有', it means there are abundant of seats. Otherwise, sum all the numbers
+            second_remaining = remainingseats(pairs, '二等座')
+            ## if business remaining has the string ’有', it means there are abundant of seats. Otherwise, sum all the numbers
+            businessremaining = remainingseats(pairs, '商务座')
+            item = {}
+            item['CityO'] = i
+            item['CityD'] = j
+            item['Distance'] = dist_twonames(i,j)
+            item['Tot_connection'] = len(pairs)
+            item['HSR_connection'] = hsr_connection
+            item['2ndClass_remaining'] = second_remaining
+            item['BusinessClass_remaining'] = businessremaining
+            # print(item)
+            networkmetric.append(item)
+
+print(networkmetric)
+
+pandas.DataFrame(networkmetric).to_excel(inputdir+'networkmetric.xlsx', index=False)
