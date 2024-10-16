@@ -4,20 +4,85 @@ from selenium.webdriver.common.by import By
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 import pandas
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
+import pytz
 
-#date_list_potential = ['2024-06-11','2024-06-12'] # 想获取数据的日期
-#date_i = 1
-date_list = [str(date.today() + timedelta(1))]
-#date_list = ['2024-06-13','2024-06-14']
+beijing_timezone = pytz.timezone('Asia/Shanghai')
+
+
+### 定义爬取数据日期。可以为“today”，“tomorrow”，或者具体日期，格式为YYYY-MM-DD
+def currentdate(date_input):
+    if date_input == "tomorrow": #1 represents tomorrow
+        date_return = str(datetime.now(beijing_timezone).date() + timedelta(1))
+    elif date_input == "today": #0 represents today
+        date_return = str(datetime.now(beijing_timezone).date())
+    else:
+        date_return = date_input
+    return date_return
+
+### 定义爬取数据的时间。如果不定义具体时间，则默认爬取全天数据。 
+### 时间对应：t_list = [1,2,3,4,5], 想获取数据的时间段（五个时间段分别对应）全天，0-6，6-12，12-18，18-24，四个时间段
+def currenttime(time_input, date_input): 
+
+    #分爬取数据的两种情况
+    if date_input == str(datetime.now(beijing_timezone).date()):
+        ##如果是今天，即即时数据爬取，提前15分钟结束每个session.否则本session可能由于时间太短爬不出数据.后面可以定义提前多久
+        time_input = datetime.strptime(time_input, '%H-%M')
+
+        if time_input <= datetime.strptime("06-00", '%H-%M'):
+            timeperiod = 1
+        elif time_input > datetime.strptime("06-00", '%H-%M') and time_input <= datetime.strptime("11-45", '%H-%M'): 
+            timeperiod = 2
+        elif time_input > datetime.strptime("11-45", '%H-%M') and time_input <= datetime.strptime("17:45", '%H-%M'):
+            timeperiod = 3
+        else:
+            timeperiod = 4
+
+    else:
+        ##如果不是今天，即未来数据爬取，按正常时间结束session
+        time_input = datetime.strptime(time_input, '%H-%M')
+
+        if time_input <= datetime.strptime("06-00", '%H-%M'):
+            timeperiod = 1
+        elif time_input > datetime.strptime("06-00", '%H-%M') and time_input <= datetime.strptime("12-00", '%H-%M'): 
+            timeperiod = 2
+        elif time_input > datetime.strptime("12-00", '%H-%M') and time_input <= datetime.strptime("18-00", '%H-%M'):
+            timeperiod = 3
+        else:
+            timeperiod = 4
+    return timeperiod
+
+
+
+### 输入抓取时间
+time_list = datetime.now(beijing_timezone).strftime("%H-%M")
+date_list = [currentdate("today")]
+
+#print(time_list)
+# print(date_list)
+
+time_i = currenttime(time_list, date_list)
+# print(time_i)
+
 # t对应12306官网上对应发车时间区间（1-5）
-t_list = [1,2,3,4,5] # 想获取数据的时间段（五个时间段分别对应？）全天，0-6，6-12，12-18，18-24，四个时间段
-time_i = 0
+t_list = [1,2,3,4,5] 
+#time_i = 2 ### 改变想要抓取的数据时间段，0-4分别对应：全天，0-6，6-12，12-18，18-24
 t = t_list[time_i]
 
-inputdir = r'D:\\微云同步助手\\332667113\\2023-交科院综合交通开放课题\\研究进度\\软著\\'
+
+### 输入城市对 - samples 
+inputdir = r'D:\\微云同步助手\\332667113\\2023-交科院综合交通开放课题\\研究进度\\软著\\' ### 定义你的输入/输出文件路径
 data = pandas.read_excel(str(inputdir + "citypair_sample2.xlsx"),skiprows = 1, header = None)
-d = []
+
+
+### 手动输入城市对
+cityO = "上海市"
+cityD = "南京市"
+data = pandas.DataFrame([[cityO, cityD]])
+#print(str(data.loc[0,:][0]))
+
+
+#### 打开Chrome
 chrome_option = webdriver.ChromeOptions()
 # p=r'C:\Users\lms\AppData\Local\Google\Chrome\User Data'
 # chrome_option.add_argument('--user-data-dir='+p)
@@ -32,6 +97,9 @@ browser.minimize_window()
 url = 'https://kyfw.12306.cn/otn/leftTicket/init?linktypeid=dc'
 browser.get(url)
 
+### d 存储所有票务数据
+d = []
+
 while True:
     if len(browser.find_elements(by=By.ID, value='fromStationText')) != 0:
         break
@@ -40,7 +108,7 @@ try:
     for n in data.index[:]:
         p = 0
         city = data.loc[n, :].values
-        print(city, n)
+        # print(city, n)
         city1 = city[0][:-1] + city[0][-1].replace('市', '')
         city2 = city[1][:-1] + city[1][-1].replace('市', '')
         # city1 = '太原'
@@ -211,7 +279,10 @@ try:
 except Exception as e:
     print(e)
     print('出错')
-print('citypair1 finished')
-pandas.DataFrame(d).to_excel(inputdir+date_list[0]+'_allday_citypair1'+'.xlsx', index=False)
+print('citypair finished')
+
+## 导出数据
+pandas.DataFrame(d).to_excel(inputdir+date_list[0]+'-'+str(time_list)+'-'+cityO+"-"+cityD+'.xlsx', index=False)
 
 browser.close()
+
