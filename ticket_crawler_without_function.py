@@ -7,12 +7,112 @@ import pandas
 from datetime import date, timedelta, datetime
 import pytz
 import requests
-
+import itertools
 
 beijing_timezone = pytz.timezone('Asia/Shanghai')
 
+# AMAP API key
+api_key = 'a3088a73b4bedfcf95e01d08933aa701'
 
-## 给定两个地名，在高德地图API中获取两地距离 -- 用于计算网络指标
+## 给定省份名，返回所有省内城市
+def get_cities_in_province(province_name, api_key):
+    #api_key = 'YOUR_API_KEY'  # Replace with your AMAP API key
+    url = f"https://restapi.amap.com/v3/config/district?key={api_key}&keywords={province_name}&subdistrict=1"
+    
+    response = requests.get(url)
+    data = response.json()
+    
+    cities = []
+    if data['status'] == '1':
+        #print(data)
+        for district in data['districts']:
+            #print(district)
+            for citylist in district['districts']:
+                #print(citylist)
+                cities.append(citylist['name'])
+    return cities
+
+## 给定city_code,在高德地图API获取城市名
+def get_city_name(city_code, api_key):
+    url = "https://restapi.amap.com/v3/config/district"
+
+    # Define query parameters
+    params = {
+        'key': api_key,
+        'keywords': city_code,  # Use city code here
+        'subdistrict': 0,
+        'extensions': 'base',   # Only fetch base information
+        'output': 'json'
+    }
+
+    # Send request to AMap API
+    response = requests.get(url, params=params)
+    result = response.json()
+
+    # Extract the city name from the response
+    if 'districts' in result and result['districts']:
+        city_name = result['districts'][0]['name']
+        print("城市名称:", city_name)
+    else:
+        print("未找到城市")
+
+    return(city_name)
+
+
+## 给定地名, city_code，返回所有跨市出行方式站点和位置
+def intercity_mode_location(city_coord, poi_code, api_key): 
+    #poi_code should be intercity mode API ID
+    url = "https://restapi.amap.com/v3/place/text"
+
+    # Define query parameters
+    params = {
+        'key': api_key,
+        'types': poi_code,
+        'location': city_coord,
+        'output': 'json'
+    }
+
+    # Send request to AMap API
+    response = requests.get(url, params=params)
+    result = response.json()
+    print(result)
+
+    # Initialize an empty list to store the POI information
+    poi_list = []
+
+    # Extract details from the JSON response
+    if 'pois' in result:
+        for place in result['pois']:
+            if place['typecode'] == '150104' or place['typecode'] == '150200' or place['typecode'] == '150400':
+                poi_details = {
+                    'name': place['name'],
+                    'address': place.get('address', 'N/A'),
+                    'location': place.get('location', 'N/A')
+                }
+                poi_list.append(poi_details)
+            else: 
+                print('查询POI类型错误，详见POI代码列表')
+
+    # Print the resulting list
+    print(poi_list)
+
+
+# 获取城市间距离
+def dist_twonames(add_1, add_2, api_key):
+    # Get coordinates
+    origin_coords = get_city_coordinates(add_1, api_key)
+    dest_coords = get_city_coordinates(add_2, api_key)
+
+    if origin_coords and dest_coords:
+        # Get the distance
+        distance = float(get_distance(origin_coords, dest_coords, api_key))/1000
+        print(f"{add_1} 和 {add_2} 两地相距: {str(distance)} KM")
+    else:
+        print("地名坐标获取出错.")
+    return(distance)
+
+
+## 给定地名，在高德地图API中获取坐标 -- 用于计算网络指标
 # Function to get latitude and longitude of a city
 def get_city_coordinates(city_name, api_key):
     url = f'https://restapi.amap.com/v3/geocode/geo?address={city_name}&key={api_key}'
@@ -25,7 +125,8 @@ def get_city_coordinates(city_name, api_key):
     else:
         return None
 
-# Function to calculate the distance between two coordinates
+
+# 给定两个坐标，获取两地距离
 def get_distance(origin_coords, dest_coords, api_key):
     origins = ','.join(origin_coords)
     destination = ','.join(dest_coords)
@@ -40,8 +141,6 @@ def get_distance(origin_coords, dest_coords, api_key):
     else:
         return None
 
-# Replace with your actual API key
-api_key = 'a3088a73b4bedfcf95e01d08933aa701'
 
 
 ### 定义爬取数据日期。可以为“today”，“tomorrow”，或者具体日期，格式为YYYY-MM-DD
@@ -53,6 +152,7 @@ def currentdate(date_input):
     else:
         date_return = date_input
     return date_return
+
 
 ### 定义爬取数据的时间。如果不定义具体时间，则默认爬取全天数据。 
 ### 时间对应：t_list = [1,2,3,4,5], 想获取数据的时间段（五个时间段分别对应）全天，0-6，6-12，12-18，18-24，四个时间段
@@ -115,6 +215,27 @@ cityD = ["宜兴市",'杭州市','合肥市']
 data = pandas.DataFrame({'cityO':cityO, 'cityD':cityD})
 print(data)
 
+### 给定省份，得到新的城市对data
+# all_cities = pandas.read_excel(str(inputdir + 'AMap_adcode_citycode.xlsx'))
+
+region = '江苏省'
+city_code_list = get_cities_in_province('江苏省', api_key)
+# print(city_code_list)
+
+cityO = city_code_list
+cityD = city_code_list
+data = pandas.DataFrame({'cityO':cityO, 'cityD':cityD})
+
+# Generate all combinations of Column1 and Column2
+combinations = list(itertools.product(data['cityO'], data['cityD']))
+# Convert the combinations to a DataFrame
+data = pandas.DataFrame(combinations, columns=['cityO', 'cityD'])
+print(data)
+
+## 想要抓取城际出行的出行方式POI和地址，用来计算网络结构
+intercity_poi = pandas.read_excel(str(inputdir + 'AMAP_POI_intercity_Code.xlsx'))
+poi_code_list = intercity_poi['POI_ID']
+
 
 #### 打开Chrome
 chrome_option = webdriver.ChromeOptions()
@@ -145,6 +266,8 @@ try:
         # print(city, n)
         city1 = city[0][:-1] + city[0][-1].replace('市', '')
         city2 = city[1][:-1] + city[1][-1].replace('市', '')
+        if city1 == city2:
+            continue
         # city1 = '太原'
         # city2 = '张家口'
         for date in date_list:
@@ -323,21 +446,6 @@ browser.close()
 
 ## 针对给定城市对组合，计算复杂网络指标
 
-# 获取城市间距离
-def dist_twonames(add_1, add_2):
-    # Get coordinates
-    origin_coords = get_city_coordinates(add_1, api_key)
-    dest_coords = get_city_coordinates(add_2, api_key)
-
-    if origin_coords and dest_coords:
-        # Get the distance
-        distance = float(get_distance(origin_coords, dest_coords, api_key))/1000
-        print(f"{add_1} 和 {add_2} 两地相距: {str(distance)} KM")
-    else:
-        print("地名坐标获取出错.")
-    return(distance)
-
-
 ### 读取票务爬取数据
 d = pandas.read_excel(outputpath)
 
@@ -389,9 +497,9 @@ for i in origin:
     for j in destination:
         #print(j)
         pairs = d[(d['出发城市'] == i) & (d['到达城市'] == j)]
-        if len(pairs) > 0:
+        
+        if len(pairs) > 0 and (pairs['车次'] != '无').any():
 
-            #print(pairs)
         ## hsr connection includes G and D
             hsr_connection = pairs[pairs['车次'].str.startswith('G')].shape[0] + pairs[pairs['车次'].str.startswith('D')].shape[0]
             ## if 2nd remaining has the string ’有', it means there are abundant of seats. Otherwise, sum all the numbers
@@ -460,3 +568,6 @@ print(pandas.to_numeric(networkmetric['lowest_price']))
 
 ### calculate network efficiency using the remaining seats of all the HSR
 network_effi_seats = pandas.to_numeric(networkmetric['TotRemainingSeats']).sum()/(tot_nodes*(tot_nodes-1))
+
+
+### 统计整个网络不同的出行方式
